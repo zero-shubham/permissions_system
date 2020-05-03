@@ -29,9 +29,11 @@ async def startup():
     await database.connect()
     await ps.setup()
 ```
-*Step1 -* __instantiate PermissionsS class__
+*Step1 -* __instantiate PermissionsS class.__
+
 *Step2 -* __during startup event after database is connected make a call to setup()__
 *_________________________________________________________________________________________*
+
 __*PermissionsS will then detect your tables add them to resources, add super-admin user-group, if there aren't already. Everytime there is a new resource that gets added automatically to resources table. User-group super-admin by default has all CRUD permissions for all resources. To add a new user-group and related permissions use built-in functions add_user_group and add_permissions.*__
 
 *PermissionsSystem is not like djano-admin or flask-admin. It doesn't provide a front-end, it provides a minimal setup to manage resources and permissions. It aims to provide autonomy and more control over to the developer.*
