@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class PermissionTypesEnum(str, Enum):
     create = "create"
     read = "read"

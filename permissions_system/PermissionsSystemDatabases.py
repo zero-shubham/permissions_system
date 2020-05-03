@@ -1,5 +1,4 @@
 from databases import Database
-from enum import Enum
 from sqlalchemy import (
     MetaData,
     Table,
