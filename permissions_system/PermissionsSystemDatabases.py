@@ -15,7 +15,7 @@ from uuid import (
     uuid4,
     UUID as UUIDModel
 )
-from constants import PermissionTypesEnum
+from permissions_system.constants import PermissionTypesEnum
 from pydantic import BaseModel
 import logging
 from typing import List
