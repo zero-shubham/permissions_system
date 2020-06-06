@@ -55,11 +55,11 @@ class PermissionsS():
             self.metadata,
             Column("id", UUID, primary_key=True),
             Column("group", ForeignKey(
-                "_ps_user_groups.group",
+                "_ps_user_groups.id",
                 ondelete="CASCADE"
             )),
             Column("resource", ForeignKey(
-                "_ps_resources.resource_table",
+                "_ps_resources.id",
                 ondelete="CASCADE"
             )),
             Column("create", Boolean, default=False),
@@ -76,7 +76,7 @@ class PermissionsS():
                 length=500), unique=True),
             Column("password", String(length=1000)),
             Column("group", ForeignKey(
-                "_ps_user_groups.group",
+                "_ps_user_groups.id",
                 ondelete="CASCADE"
             ))
         )
@@ -128,11 +128,20 @@ class PermissionsS():
         user_group: str,
         resources: List[ResourceWithPermissions]
     ):
+        # * --- GET USER_GROUP ID ----
+        query = self.UserGroup.select().with_only_columns(
+            [self.UserGroup.c.group]
+        ).where(
+            self.UserGroup.columns.group == user_group
+        )
+        user_group_obj = await self.database.fetch_one(query)
+        user_group_id = user_group_obj["id"]
+        # * -----------------------------
         query = self.Permission.insert()
         values = [
             {
                 "id": uuid4(),
-                "group": user_group,
+                "group": user_group_id,
                 "resource": rwp.resource,
                 "create": rwp.create,
                 "read": rwp.read,
@@ -219,7 +228,7 @@ class PermissionsS():
 
     async def user_has_permissions(
         self,
-        user_id: int,
+        user_id: UUIDModel,
         resource: str,
         permission_type: PermissionTypesEnum
     ):
