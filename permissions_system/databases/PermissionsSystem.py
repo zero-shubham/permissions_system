@@ -236,6 +236,8 @@ class PermissionsS():
             self.Permission.join(self.UserGroup.join(self.User))
         ).where(
             self.Permission.c.resource == resource
+        ).where(
+            self.User.columns.id == user_id
         )
         res = await self.database.fetch_one(query)
         res = dict(res.items())
