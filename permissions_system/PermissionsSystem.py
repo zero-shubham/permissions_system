@@ -55,11 +55,11 @@ class PermissionsS():
             self.metadata,
             Column("id", UUID, primary_key=True),
             Column("group", ForeignKey(
-                "_ps_user_groups.id",
+                "_ps_user_groups.group",
                 ondelete="CASCADE"
             )),
             Column("resource", ForeignKey(
-                "_ps_resources.id",
+                "_ps_resources.resource_table",
                 ondelete="CASCADE"
             )),
             Column("create", Boolean, default=False),
@@ -76,10 +76,16 @@ class PermissionsS():
                 length=500), unique=True),
             Column("password", String(length=1000)),
             Column("group", ForeignKey(
-                "_ps_user_groups.id",
+                "_ps_user_groups.group",
                 ondelete="CASCADE"
             ))
         )
+
+        # ! not creating tables as we are expecting to handled
+        # ! by alembic
+        # * once all tables are declared try to create them
+        # engine = create_engine(self.DB_URL)
+        # self.metadata.create_all(engine)
 
     # * ---- ADD RESOURCES -----
     async def add_resources(self, new_resources: list):
@@ -128,20 +134,11 @@ class PermissionsS():
         user_group: str,
         resources: List[ResourceWithPermissions]
     ):
-        # * --- GET USER_GROUP ID ----
-        query = self.UserGroup.select().with_only_columns(
-            [self.UserGroup.c.group]
-        ).where(
-            self.UserGroup.columns.group == user_group
-        )
-        user_group_obj = await self.database.fetch_one(query)
-        user_group_id = user_group_obj["id"]
-        # * -----------------------------
         query = self.Permission.insert()
         values = [
             {
                 "id": uuid4(),
-                "group": user_group_id,
+                "group": user_group,
                 "resource": rwp.resource,
                 "create": rwp.create,
                 "read": rwp.read,
@@ -176,8 +173,6 @@ class PermissionsS():
             logging.info(f"SuperAdmin was initialised.")
 
     async def setup(self):
-        engine = create_engine(self.DB_URL)
-        self.metadata.create_all(engine)
         all_tables = list(self.metadata.tables.keys())
 
         query = self.Resource.select().with_only_columns(
@@ -228,7 +223,7 @@ class PermissionsS():
 
     async def user_has_permissions(
         self,
-        user_id: UUIDModel,
+        user_id: int,
         resource: str,
         permission_type: PermissionTypesEnum
     ):
@@ -237,7 +232,7 @@ class PermissionsS():
         ).where(
             self.Permission.c.resource == resource
         ).where(
-            self.User.columns.id == user_id
+            self.User.c.id == user_id
         )
         res = await self.database.fetch_one(query)
         res = dict(res.items())
