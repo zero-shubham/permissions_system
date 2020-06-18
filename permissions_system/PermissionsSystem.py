@@ -6,7 +6,8 @@ from sqlalchemy import (
     String,
     ForeignKey,
     Boolean,
-    create_engine
+    create_engine,
+    inspect
 )
 from sqlalchemy.dialects.postgresql import (
     UUID
@@ -81,13 +82,8 @@ class PermissionsS():
             ))
         )
 
-        # ! not creating tables as we are expecting to handled
-        # ! by alembic
-        # * once all tables are declared try to create them
-        # engine = create_engine(self.DB_URL)
-        # self.metadata.create_all(engine)
-
     # * ---- ADD RESOURCES -----
+
     async def add_resources(self, new_resources: list):
         values = [
             {
@@ -172,8 +168,19 @@ class PermissionsS():
             await self.add_permissions("super_admin", resources)
             logging.info(f"SuperAdmin was initialised.")
 
-    async def setup(self):
-        all_tables = list(self.metadata.tables.keys())
+    async def setup(self, exclude_tables: List[str] = []):
+        # * once all tables are declared try to create them
+        engine = create_engine(self.DB_URL)
+
+        # * get list of tables by inspecting db
+        inspector = inspect(engine)
+        all_tables = [
+            table_name for table_name in inspector.get_table_names(schema="public")]
+        all_tables = [
+            table
+            for table in all_tables if table not in exclude_tables
+        ]
+        self.metadata.create_all(engine)
 
         query = self.Resource.select().with_only_columns(
             [self.Resource.c.resource_table])
