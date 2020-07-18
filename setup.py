@@ -11,7 +11,7 @@ README = (HERE / "README.md").read_text()
 # This call to setup() does all the work
 setup(
     name="permissions-system",
-    version="0.1.9",
+    version="0.2",
     description="Alternative to admin utilities for more autonomy, targeted towards FastAPI.",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -27,11 +27,7 @@ setup(
     packages=find_packages(exclude=("tests",)),
     include_package_data=True,
     install_requires=[
-        "asyncpg==0.20.1",
-        "autopep8==1.5.2",
-        "databases==0.3.2",
-        "gino==1.0.0",
-        "pycodestyle==2.5.0",
-        "sqlalchemy==1.3.16"
+        "sqlalchemy==1.3.18",
+        "pydantic==1.6.1"
     ],
 )
