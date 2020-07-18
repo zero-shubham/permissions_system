@@ -51,13 +51,13 @@ class PermissionsS():
         session = self.Session()
         values = [
             {
-                "id": uuid4(),
+                "id": str(uuid4()),
                 "resource_name": self.table_to_name(resource),
                 "resource_table": resource
             } for resource in new_resources
         ]
         resources = [ResourceWithPermissions(**{
-            "id": uuid4(),
+            "id": str(uuid4()),
             "resource": resource,
             "create": True,
             "read": True,
@@ -66,7 +66,7 @@ class PermissionsS():
         }) for resource in new_resources]
 
         query = self.Resource.insert()
-        session.execute(query=query, values=values)
+        session.execute(query, values)
         session.commit()
         self.add_permissions("super_admin", resources)
         logging.info(f"Resources {new_resources} were added.")
