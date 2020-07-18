@@ -1,25 +1,25 @@
-from databases import Database
 from sqlalchemy import (
     MetaData,
-    Table,
-    Column,
-    String,
-    ForeignKey,
-    Boolean,
     create_engine,
     inspect
 )
-from sqlalchemy.dialects.postgresql import (
-    UUID
-)
+from sqlalchemy.orm import sessionmaker
 from uuid import (
     uuid4,
     UUID as UUIDModel
 )
 from permissions_system.constants import PermissionTypesEnum
+from permissions_system.models import (
+    get_permissions_table,
+    get_resources_table,
+    get_user_groups_table,
+    get_users_table
+)
 from pydantic import BaseModel
 import logging
 from typing import List
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class ResourceWithPermissions(BaseModel):
@@ -32,59 +32,23 @@ class ResourceWithPermissions(BaseModel):
 
 
 class PermissionsS():
-    def __init__(self,  metadata: MetaData, database: Database, DB_URL: str):
+    def __init__(self,  metadata: MetaData,  DB_URL: str):
         self.metadata = metadata
         self.DB_URL = DB_URL
-        self.database = database
-        self.UserGroup = Table(
-            "_ps_user_groups",
-            self.metadata,
-            Column("id", UUID, primary_key=True),
-            Column("group", String(length=500), unique=True)
-        )
+        self.Session = sessionmaker()
 
-        self.Resource = Table(
-            "_ps_resources",
-            self.metadata,
-            Column("id", UUID, primary_key=True),
-            Column("resource_table", String(length=500), unique=True),
-            Column("resource_name", String(length=600))
-        )
+        self.UserGroup = get_user_groups_table(self.metadata)
 
-        self.Permission = Table(
-            "_ps_permissions",
-            self.metadata,
-            Column("id", UUID, primary_key=True),
-            Column("group", ForeignKey(
-                "_ps_user_groups.group",
-                ondelete="CASCADE"
-            )),
-            Column("resource", ForeignKey(
-                "_ps_resources.resource_table",
-                ondelete="CASCADE"
-            )),
-            Column("create", Boolean, default=False),
-            Column("read", Boolean, default=False),
-            Column("update", Boolean, default=False),
-            Column("delete", Boolean, default=False),
-        )
+        self.Resource = get_resources_table(self.metadata)
 
-        self.User = Table(
-            "_ps_users",
-            self.metadata,
-            Column("id", UUID, primary_key=True),
-            Column("user_name", String(
-                length=500), unique=True),
-            Column("password", String(length=1000)),
-            Column("group", ForeignKey(
-                "_ps_user_groups.group",
-                ondelete="CASCADE"
-            ))
-        )
+        self.Permission = get_permissions_table(self.metadata)
+
+        self.User = get_users_table(self.metadata)
 
     # * ---- ADD RESOURCES -----
 
-    async def add_resources(self, new_resources: list):
+    def add_resources(self, new_resources: list):
+        session = self.Session()
         values = [
             {
                 "id": uuid4(),
@@ -102,38 +66,44 @@ class PermissionsS():
         }) for resource in new_resources]
 
         query = self.Resource.insert()
-        await self.database.execute_many(query=query, values=values)
-        await self.add_permissions("super_admin", resources)
+        session.execute(query=query, values=values)
+        session.commit()
+        self.add_permissions("super_admin", resources)
         logging.info(f"Resources {new_resources} were added.")
 
     # * ------- DELETE RESOURCES -------
-    async def delete_resources(self, stale_resources: list):
+    def delete_resources(self, stale_resources: list):
+        session = self.Session()
         query = self.Resource.delete().where(
             self.Resource.c.resource_table.in_(stale_resources)
         )
-        res = await self.database.execute(query)
+        session.execute(query)
+        session.commit()
         logging.info(f"Resources {stale_resources} were removed.")
 
 # * ------ ADD USER GROUPS ------------
-    async def add_user_group(self, user_group: str):
+    def add_user_group(self, user_group: str):
+        session = self.Session()
         query = self.UserGroup.insert()
         values = {
-            "id": uuid4(),
+            "id": str(uuid4()),
             "group": user_group
         }
-        await self.database.execute(query=query, values=values)
+        session.execute(query, values)
+        session.commit()
         logging.info(f"UserGroup {user_group} added.")
 
 # * ------ ADD PERMISSIONS ------------
-    async def add_permissions(
+    def add_permissions(
         self,
         user_group: str,
         resources: List[ResourceWithPermissions]
     ):
+        session = self.Session()
         query = self.Permission.insert()
         values = [
             {
-                "id": uuid4(),
+                "id": str(uuid4()),
                 "group": user_group,
                 "resource": rwp.resource,
                 "create": rwp.create,
@@ -142,35 +112,36 @@ class PermissionsS():
                 "delete": rwp.delete
             } for rwp in resources
         ]
-        await self.database.execute_many(query=query, values=values)
+        session.execute(query, values)
+        session.commit()
         logging.info(f"Permissons added for {user_group} as {values}")
 
     # * ----- INIT SUPER ADMIN ------
-    async def _init_super_admin(self):
-        query = self.UserGroup.select().where(
-            self.UserGroup.columns.group == "super_admin")
+    def _init_super_admin(self):
+        session = self.Session()
+        super_admin = session.query(self.UserGroup).filter_by(
+            group="super_admin").first()
 
-        super_admin = await self.database.fetch_val(query)
         if not super_admin:
-            # add super_admin to user group also add permissions
-            await self.add_user_group("super_admin")
-            # get all resources and provide super_admin permissions for each
-            query = self.Resource.select()
-            resources = await self.database.fetch_all(query=query)
+            # * add super_admin to user group also add permissions
+            self.add_user_group("super_admin")
+            # * get all resources and provide super_admin permissions for each
+            resources = session.query(self.Resource).all()
             resources = [ResourceWithPermissions(**{
                 "id": uuid4(),
-                "resource": resource.get("resource_table"),
+                "resource": resource[1],
                 "create": True,
                 "read": True,
                 "update": True,
                 "delete": True
             }) for resource in resources]
-            await self.add_permissions("super_admin", resources)
+            self.add_permissions("super_admin", resources)
             logging.info(f"SuperAdmin was initialised.")
 
-    async def setup(self, exclude_tables: List[str] = []):
-        # * once all tables are declared try to create them
+    def setup(self, exclude_tables: List[str] = []):
+        # * create engine and bind to Session
         engine = create_engine(self.DB_URL)
+        self.Session.configure(bind=engine)
 
         # * get list of tables by inspecting db
         inspector = inspect(engine)
@@ -180,70 +151,74 @@ class PermissionsS():
             table
             for table in all_tables if table not in exclude_tables
         ]
+        # * once all tables are declared try to create them
         self.metadata.create_all(engine)
 
-        query = self.Resource.select().with_only_columns(
-            [self.Resource.c.resource_table])
-        resources = await self.database.fetch_all(query)
-        resources = [res.get("resource_table") for res in resources]
+        # * list all resource table names
+        session = self.Session()
+        resources = session.query(self.Resource.c.resource_table).all()
+        resources = [res[0] for res in resources]
 
-        # check if "super_admin" User group exists
-        # if not add it
-        await self._init_super_admin()
+        # * check if "super_admin" User group exists
+        # * if not add it
+        self._init_super_admin()
 
-        #  if there are some stale resources get rid of them
+        #  * if there are some stale resources get rid of them
         stale_resources = [
             resource for resource in resources if resource not in all_tables]
         if len(stale_resources):
-            await self.delete_resources(stale_resources)
+            self.delete_resources(stale_resources)
 
         # if there are some new tables add them to resources
         new_tables = [table for table in all_tables if table not in resources]
         if len(new_tables):
-            await self.add_resources(new_tables)
+            self.add_resources(new_tables)
 
-        self.current_user_groups = await self.get_user_groups()
+        self.current_user_groups = self.get_user_groups()
 
-    async def create_user(
+    def create_user(
         self,
         user_id: UUIDModel,
         user_name: str,
         password: str,
         user_group: str
     ):
-        query = self.User.insert().values(
-            id=user_id,
-            user_name=user_name,
-            password=password,
-            group=user_group
-        )
-        await self.database.execute(query)
+        session = self.Session()
+        query = self.User.insert()
+        session.execute(query, {
+            "id": str(user_id),
+            "user_name": user_name,
+            "password": password,
+            "group": user_group
+        })
+        session.commit()
         return user_id
 
-    async def get_user_groups(self):
-        query = self.UserGroup.select().with_only_columns(
-            [self.UserGroup.c.group]
-        )
-        user_groups = await self.database.fetch_all(query)
-        user_groups = [user_group.get("group") for user_group in user_groups]
+    def get_user_groups(self):
+        session = self.Session()
+        user_groups = session.query(self.UserGroup.c.group).all()
+        user_groups = [user_group[0] for user_group in user_groups]
         return user_groups
 
-    async def user_has_permissions(
+    def user_has_permissions(
         self,
-        user_id: int,
+        user_id: UUIDModel,
         resource: str,
         permission_type: PermissionTypesEnum
     ):
-        query = self.Permission.select().select_from(
-            self.Permission.join(self.UserGroup.join(self.User))
-        ).where(
+        session = self.Session()
+        res = session.query(
+            self.Permission.columns[permission_type]
+        ).join(
+            self.UserGroup
+        ).join(
+            self.User
+        ).filter(
             self.Permission.c.resource == resource
-        ).where(
+        ).filter(
             self.User.c.id == user_id
-        )
-        res = await self.database.fetch_one(query)
-        res = dict(res.items())
-        return res[permission_type]
+        ).first()
+        return res[0]
 
     @classmethod
     def table_to_name(cls, val: str) -> str:
