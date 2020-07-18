@@ -24,7 +24,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
     ],
-    packages=find_packages(exclude=("tests",)),
+    packages=find_packages(exclude=("tests","develop")),
     include_package_data=True,
     install_requires=[
         "sqlalchemy==1.3.18",
