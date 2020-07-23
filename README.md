@@ -44,8 +44,6 @@ _********\*\*\*\*********\*\*\*\*********\*\*\*\*********\_********\*\*\*\******
 
 _PermissionsSystem is not like django-admin or flask-admin. It doesn't provide a front-end admin dashboard, but a minimal setup to manage resources and permissions. It aims to provide autonomy and more control over to the developer. For front-end you will end up using something more custom or [React-admin](https://marmelab.com/react-admin/) or [vue-element-admin](https://github.com/PanJiaChen/vue-element-admin)_
 
-#### What's next?
-
-- Provide examples.
+**Find an example [here](https://github.com/zero-shubham/permissions_system_example), to learn how it can be used.**
 
 ## PermissionsSystem now only uses sqlalchemy and is completely sync.
