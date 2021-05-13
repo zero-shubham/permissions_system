@@ -28,7 +28,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "sqlalchemy==1.3.20",
-        "pydantic==1.6.1"
+        "pydantic==1.6.2"
     ],
     setup_requires=['wheel']
 )
