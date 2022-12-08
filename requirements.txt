@@ -2,7 +2,7 @@ alembic==1.4.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (
 asyncpg==0.20.1; python_full_version >= "3.5.0"
 bcrypt==3.1.7; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.4.0")
 bleach==3.1.5; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
-certifi==2020.4.5.1
+certifi==2022.12.7
 cffi==1.14.0; sys_platform == "linux"
 chardet==3.0.4
 click==7.1.2; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
